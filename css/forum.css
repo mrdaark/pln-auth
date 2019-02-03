@@ -1,0 +1,134 @@
+.ulogin_info {
+    padding: 0;
+    margin: 0 0 5px 0;
+}
+
+.ulogin_info .profile_image  {
+    background: #f3f3f3 url(/pictures/forum/nopic.png) no-repeat right top;
+    background-size: contain;
+    width: 50px;
+    height: 50px;
+    display: block;
+    margin: 0 5px 0 0;
+    float:left;
+}
+
+.profile_link {
+    list-style: none;
+    margin: 5px 0;
+    padding: 0;
+    float:left;
+}
+
+.profile_link li {
+    display: block;
+}
+
+.profile_link li a.forum_logout {
+    font-size: 80%;
+}
+
+.pl__comments__form__comment {
+    margin-top:2px;
+}
+
+.forum_avatar {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    margin-right: 8px;
+    vertical-align: middle;
+    border-radius: 4px;
+}
+
+#auth_form {
+    width: 450px;
+    height: 220px;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    margin-left:-275px;
+    margin-top:-110px;
+
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.9);
+
+    border: 1px solid rgb(129, 0, 0);
+    border-radius: 5px;
+
+    padding: 10px;
+    background: #fff;
+
+    z-index:101;
+}
+
+#auth_form  .auth_form_header {
+    font-size: 30px;
+    font-weight: 500;
+    display: block;
+    color: #a0030d;
+}
+
+#auth_form .auth_form_item {
+    position: relative;
+    margin-bottom: 10px;
+}
+
+#auth_form .auth_form_label {
+    position: absolute;
+    pointer-events: none;
+    left: 50px;
+    top: 0;
+    line-height: 40px;
+    color: #cccccc;
+}
+
+#auth_form .auth_form_input {
+    display: block;
+    font-size:16px;
+    border: 1px solid #cccccc;
+    border-radius: 4px;
+    padding: 13px 15px;
+    height: 40px;
+    width: 380px;
+    margin:0 auto;
+    box-sizing: border-box;
+}
+
+#auth_form .auth_form_input:focus + label,
+#auth_form .auth_form_input:valid + label,
+#auth_form .auth_form_input:disabled + label {
+    font-size:10px;
+    top: -12px;
+    font-weight: 300;
+    color: #a0030d;
+}
+
+#auth_form #auth_button {
+    height: 40px;
+    line-height: 40px;
+    width: 120px;
+    text-align: center;
+    border:none;
+    border-radius: 4px;
+    background: #a0030d;
+    color:white;
+    font-weight: bold;
+    font-size:16px;
+    margin: 10px auto;
+    display: block;
+}
+
+#auth_form #auth_button:hover {
+    background: #b52931;
+    box-shadow: 0 0 2px #a0030d;
+}
+
+.body-overlay {
+	position: fixed;
+	top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+	background: rgba(0, 0, 0, 0.5);
+	z-index:100;
+}
