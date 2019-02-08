@@ -371,28 +371,12 @@ const auth_module = (function() {
         input_phone.addEventListener('focus', () => {
             input_phone.value=format_phone(input_phone.value);
         });
-        
+
         div.appendChild(div_phone);
 
-        const div_code = document.createElement('div');
-        div_code.className='auth_form_item';
-        div_code.id='auth_form_code';
-        div_code.style.display='none';
-
-        const input_code = document.createElement('input');
-        input_code.name = 'auth_code';
-        input_code.className='auth_form_input';
-        input_code.id='auth_code';
-        input_code.required=true;
-
-        const label_code = document.createElement('label');
-        label_code.for="auth_code";
-        label_code.className='auth_form_label';
-        label_code.innerHTML="Код из SMS";
-
-        div_code.appendChild(input_code);
-        div_code.appendChild(label_code);
-
+        const div_code = create_input('code','Код из SMS','');
+        div_code.style.display = 'none';
+        
         div.appendChild(div_code);
 
         const auth_button = document.createElement('button');
