@@ -134,7 +134,7 @@ const auth_module = (function() {
                 elements[i].forum_submit.onclick = () => true;
             }
 
-        } 
+        }
         else
         {
             for (let i=0;i<elements.length;i+=1)
@@ -270,6 +270,30 @@ const auth_module = (function() {
         }
     };
 
+    const create_input = (prefix,name,value) => {
+        
+        const div = document.createElement('div');
+        div.className='auth_form_item';
+        div.id='auth_form_'+prefix;
+
+        const input = document.createElement('input');
+        input.name = 'auth_'+prefix;
+        input.className='auth_form_input';
+        input.value=value;
+        input.id='auth_'+prefix;
+        input.required=true;
+
+        const label = document.createElement('label');
+        label.for="auth_"+prefix;
+        label.className='auth_form_label';
+        label.innerHTML=name;
+
+        div.appendChild(input);
+        div.appendChild(label);
+
+        return div;
+    };
+
     const profile_form = (user) => {
         
         remove_form();
@@ -286,47 +310,11 @@ const auth_module = (function() {
         div.appendChild(h);
 
         //Имя
-        const div_fname = document.createElement('div');
-        div_fname.className='auth_form_item';
-        div_fname.id='auth_form_fname';
-
-        const input_fname = document.createElement('input');
-        input_fname.name = 'auth_fname';
-        input_fname.className='auth_form_input';
-        input_fname.name=user.first_name;
-        input_fname.id='auth_fname';
-        input_fname.required=true;
-
-        const label_fname = document.createElement('label');
-        label_fname.for="auth_fname";
-        label_fname.className='auth_form_label';
-        label_fname.innerHTML="Имя";
-
-        div_fname.appendChild(input_fname);
-        div_fname.appendChild(label_fname);
-
+        const div_fname = create_input('fname','Имя',user.first_name);       
         div.appendChild(div_fname);
 
         //Фамилия
-        const div_lname = document.createElement('div');
-        div_lname.className='auth_form_item';
-        div_lname.id='auth_form_lname';
-
-        const input_lname = document.createElement('input');
-        input_lname.name = 'auth_lname';
-        input_lname.className='auth_form_input';
-        input_lname.name=user.last_name;
-        input_lname.id='auth_lname';
-        input_lname.required=true;
-
-        const label_lname = document.createElement('label');
-        label_lname.for="auth_lname";
-        label_lname.className='auth_form_label';
-        label_lname.innerHTML="Фамилия";
-
-        div_lname.appendChild(input_lname);
-        div_lname.appendChild(label_lname);
-
+        const div_lname = create_input('lname','Фамилия',user.last_name);
         div.appendChild(div_lname);
 
         //надо бы сделать загрузку фото, но это потом, может быть.
@@ -372,33 +360,18 @@ const auth_module = (function() {
 
         div.appendChild(h);
 
-        const div_phone = document.createElement('div');
-        div_phone.className='auth_form_item';
-
-        const input_phone = document.createElement('input');
-        input_phone.name = 'auth_phone';
-        //input_phone.placeholder="номер телефона";
-        input_phone.className='auth_form_input';
-        input_phone.id='auth_phone';
-        input_phone.required=true;
-
+        //номер телефона
+        const div_phone = create_input('phone','Номер телефона','');
+        const input_phone = div_phone.getElementsByTagName('input')[0];
+        
         input_phone.addEventListener('input',(evt)=>{
             input_phone.value=format_phone(input_phone.value);
-            //console.log(/\+\d{11,13}/.test(input_phone.value));
         });
 
         input_phone.addEventListener('focus', () => {
             input_phone.value=format_phone(input_phone.value);
         });
-
-        const label_phone = document.createElement('label');
-        label_phone.for="auth_phone";
-        label_phone.className='auth_form_label';
-        label_phone.innerHTML="Номер телефона";
-
-        div_phone.appendChild(input_phone);
-        div_phone.appendChild(label_phone);
-
+        
         div.appendChild(div_phone);
 
         const div_code = document.createElement('div');
