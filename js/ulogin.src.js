@@ -210,6 +210,13 @@ const auth_module = (function() {
                     elements[i].profile_link.onclick="return false;";
                     elements[i].profile_link.target="";
                 }
+                if (user.network==='smsc.ru')
+                {
+                    elements[i].profile_link.addEventListener('click',(evt)=>{
+                        evt.preventDefault();
+                        profile_form(user);
+                    });   
+                }
                 
                 elements[i].profile_link.innerHTML=user.first_name+' '+user.last_name;
                 elements[i].ulogin_info.style.display="block";
@@ -223,6 +230,8 @@ const auth_module = (function() {
                 //и разрешить кнопку
                 elements[i].forum_submit.onclick = () => true;
             }
+            //картинку поменять...
+            [...document.querySelectorAll(".profile_image")].map(el=>el.style.backgroundImage="url("+user.image+")");
 
         }
         else
@@ -379,30 +388,74 @@ const auth_module = (function() {
         return div;
     };
 
-    const profile_form = (user) => {
+    const profile_form = (u) => {
         
         remove_form();
       
         const div = document.createElement('div');
         div.id='auth_form';
-        div.style.height='250px';
-        div.style.marginTop='-125px';
+        div.style.height='300px';
+        div.style.marginTop='-150px';
 
         const h = document.createElement('p');
         h.className='auth_form_header';
-        h.innerHTML='Введите данные';
-
+        h.innerHTML='Данные профиля';
         div.appendChild(h);
 
+        const img = document.createElement('img');
+        img.src=u.image;
+        img.id='profile_avatar';
+        div.appendChild(img);
+
         //Имя
-        const div_fname = create_input('fname','Имя',user.first_name);       
+        const div_fname = create_input('fname','Имя',u.first_name);       
         div.appendChild(div_fname);
 
         //Фамилия
-        const div_lname = create_input('lname','Фамилия',user.last_name);
+        const div_lname = create_input('lname','Фамилия',u.last_name);
         div.appendChild(div_lname);
 
         //надо бы сделать загрузку фото, но это потом, может быть.
+        const div_image = create_input('image','Выберите фотографию',u.image);
+        const image_input=div_image.getElementsByTagName('input')[0];
+        image_input.type='file';
+        image_input.accept='image/*';
+
+        image_input.addEventListener('change',()=>{
+            console.log(image_input.files);
+            //сделать upload и поменять картинку...
+
+            const image = new FormData();
+            image.append('photo',image_input.files[0]);
+
+            const xhr = new XMLHttpRequest();
+            xhr.open("POST",backend_url+'?act=upload_image',true);
+            //xhr.setRequestHeader('Content-Type', 'multipart/form-data');
+            xhr.send(image);
+
+            xhr.onreadystatechange = () => {
+                if (xhr.readyState!==4) {return;}
+                if (xhr.status !== 200) {
+                    console.log(xhr.status + ': ' + xhr.statusText);
+                } else {
+                    user = JSON.parse(xhr.responseText);
+                    if (user.error === undefined) {
+                        //поменять картинку
+                        img.src=user.image;
+                        //и на основной странице...
+                        [...document.querySelectorAll(".profile_image")].map(el=>el.style.backgroundImage="url("+user.image+")");
+                    } else {
+                        alert("Ошибка загрузки картинки");
+                    }
+                }
+            }
+
+        
+        });
+
+        div_image.classList.add('auth_profile_image');
+
+        div.appendChild(div_image);
 
         //Кнопка
         const auth_button = document.createElement('button');
@@ -411,16 +464,41 @@ const auth_module = (function() {
         auth_button.className='auth_button';
 
         auth_button.addEventListener('click',()=> {
-            getInfo({
-                user: user.id,
-                first_name: document.querySelector("#auth_fname").value,
-                last_name: document.querySelector("#auth_lname").value,
-                mode: 'profile',
-                provider: 'sms',
-                token: getCookie('profile_token'),
-            });
-        });
+            console.log('here');
+            //сохранить это безобразие
+            const xhr = new XMLHttpRequest();
 
+            const token=getCookie('auth_token');
+            const first_name=div_fname.getElementsByTagName('input')[0].value;
+            const last_name=div_lname.getElementsByTagName('input')[0].value;
+            if (first_name.trim()==='' || last_name.trim()==='')
+            {
+                alert("Необходимо заполнить все поля.");
+                return false;
+            }
+
+            xhr.open("POST",backend_url+'?act=update_profile',true);
+            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            xhr.send('token='+token+'&last_name='+last_name+'&first_name='+first_name);
+    
+            xhr.onreadystatechange = () => {
+                if (xhr.readyState!==4) {return;}
+                if (xhr.status !== 200) {
+                    console.log(xhr.status + ': ' + xhr.statusText);
+                } else {
+                    user = JSON.parse(xhr.responseText);
+                    if (user.error===undefined)
+                    {
+                        switch_state('login');
+                        remove_form();
+                    }
+                    else
+                    {
+                        alert("Ошибка сохранения профиля: "+user.error[0].text);
+                    }
+                }
+            };
+        });
         div.appendChild(auth_button);
 
         //подложка
@@ -491,7 +569,7 @@ const auth_module = (function() {
         let countdown;
 
         const request_code = () => {
-            console.log('login');
+            //console.log('login');
             //проверим формат
             const phone = document.querySelector('#auth_phone').value;
             if (/^\+\d{11,13}$/.test(phone))

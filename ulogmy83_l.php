@@ -61,7 +61,6 @@ if (isset($_GET['act']))
                             $update.="last_name='".$db->real_escape_string(trim($_GET['last_name']))."',";
                         }
 
-                        //добавить удаления старого кода из sms
                         if ($update!='')
                         {
                             $update=substr($update,0,-1)." WHERE id='".$res['id']."'";
@@ -122,6 +121,92 @@ if (isset($_GET['act']))
             echo json_encode(['t'=>$_COOKIE['auth_token']]);
             die();
         break;
+
+        case 'update_profile':
+            if (isset($_COOKIE['auth_token']) && $_COOKIE['auth_token']!='')
+            {
+
+                if (!(isset($_POST['first_name'])&&trim($_POST['first_name']!='')&&isset($_POST['last_name'])&&trim($_POST['last_name']!='')))
+                {
+                    echo json_encode(['error'=>['code'=>2,'text'=>'error request']]);
+                    die();
+                }
+
+                $r = $db->query("SELECT id FROM forum_user WHERE SHA1(CONCAT(`identity`,`network`))='".$db->real_escape_string($_COOKIE['auth_token'])."'");
+                if ($r->num_rows)
+                {
+                    $res = $r->fetch_assoc();
+                    $db->query("UPDATE forum_user SET first_name='".$db->real_escape_string(mb_convert_encoding($_POST['first_name'],'CP-1251','UTF-8'))."',last_name='".$db->real_escape_string(mb_convert_encoding($_POST['last_name'],'CP-1251','UTF-8'))."' WHERE id='".$res['id']."'");
+                    $r=$db->query("SELECT id,first_name,last_name,identity,profile,image,network FROM forum_user WHERE id='".$res['id']."'");
+                    $res=$r->fetch_assoc();
+                    echo json_encode(arr2UTF8($res));
+                    die();
+                }
+            }
+            echo json_encode(['error'=>['code'=>'1','text'=>'user not login']]);
+            die();
+        break;
+
+        case 'upload_image':
+            $path = realpath(__DIR__ . "/pictures/forum/").'/';
+            //загрузка картинки...
+            //1. проверить что пользователь залогинен
+            if (isset($_COOKIE['auth_token']) && $_COOKIE['auth_token']!='')
+            {
+                $user=[];
+                $r = $db->query("SELECT * FROM forum_user WHERE SHA1(CONCAT(`identity`,`network`))='".$db->real_escape_string($_COOKIE['auth_token'])."'");
+                if ($r->num_rows)
+                {
+                    $user = $r->fetch_assoc();
+                }
+                else
+                {
+                    echo json_encode(['error'=>['code'=>'1','text'=>'user not login']]);
+                    die();
+                }
+                
+                if (isset($_FILES['photo']))
+                {
+                    $ext_list=['gif','jpg','jpeg','png'];
+                    $fn = $_FILES['photo']['name'];
+                    $ext = strtolower(pathinfo($fn, PATHINFO_EXTENSION));
+                    if( in_array($ext,$ext_list) )
+                    {
+                        $image=$user['id'].'_'.time().'.'.$ext;
+
+                        if (!move_uploaded_file($_FILES['photo']['tmp_name'],$path.$image))
+                        {
+                            echo json_encode(['error'=>['code'=>'4','text'=>'error loading image on server']]);
+                            die();  
+                        }
+
+                        if (file_exists($path.$image)) {
+                            $db->query("UPDATE forum_user SET image='/pictures/forum/".$image."' WHERE id='".$user['id']."'");
+                            echo json_encode(['image'=>'/pictures/forum/'.$image]);
+                            die();
+                        }
+                        else
+                        {
+                            echo json_encode(['error'=>['code'=>'4','text'=>'error loading image on server']]);
+                            die();  
+                        }
+                    }
+                    else
+                    {
+                        echo json_encode(['error'=>['code'=>'3','text'=>'wrong image format']]);
+                        die();
+                    }
+                }
+                else
+                {
+                    echo json_encode(['error'=>['code'=>'2','text'=>'no image uploaded']]);
+                    die();
+                }
+            }
+            echo json_encode(['error'=>['code'=>'1','text'=>'user not login']]);
+            die();
+        break;
+        
         case 'send_request':
         {
             //todo: нужно добавить проверку номера
@@ -230,6 +315,7 @@ function getUserInfo ($user,&$db) {
 
         if ($mode=='ulogin')
         {
+            
             $photo = savePhoto(['photo'=>$user['photo'],'id'=>$ret['id']]);
             $db->query("UPDATE forum_user SET first_name = '".$escape_user['first_name']."',last_name = '".$escape_user['last_name']."',image = '".$photo."',profile='".$escape_user['profile']."' WHERE id = '".$ret['id']."'");
 
@@ -252,7 +338,7 @@ function getUserInfo ($user,&$db) {
 
             //загрузим картинку...
             $photo = savePhoto($user);
-            $db->query("UPDATE forum_user SET image = '".$photo."'");
+            $db->query("UPDATE forum_user SET image = '".$photo."' WHERE id='".$id."'");
 
             $res = $db->query("SELECT * FROM forum_user WHERE id='".$id."'");
             if ($res->num_rows)
@@ -280,15 +366,16 @@ function arr2UTF8($arr)
 
 function savePhoto($user) 
 {
+    
     $path = realpath(__DIR__ . "/pictures/forum/").'/';
     if (isset($user['photo']) && $user['photo']!='')
     {
         //получим картинку, сохраним в темп
-        $tmp = "tmp/".time();
+        $tmp = $path.time()."___".$user['id'];
         
         file_put_contents($tmp,file_get_contents($user['photo']));
         $type = exif_imagetype($tmp);
-
+        
         switch ($type)
         {
             case IMAGETYPE_GIF:

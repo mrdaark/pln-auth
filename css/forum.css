@@ -61,6 +61,14 @@
     z-index:101;
 }
 
+#auth_form #profile_avatar {
+    position: absolute;
+    top: 25px;
+    right: 45px;
+    width: 70px;
+    height: 70px;
+}
+
 #auth_form  .auth_form_header {
     font-size: 30px;
     font-weight: 500;
@@ -102,6 +110,36 @@
     top: -12px;
     font-weight: 300;
     color: #a0030d;
+}
+
+#auth_form .auth_profile_image .auth_form_input:focus + label,
+#auth_form .auth_profile_image .auth_form_input:valid + label,
+#auth_form .auth_profile_image .auth_form_input:disabled + label {
+    font-size:16px;
+    font-weight: normal;
+    color: #cccccc;
+    pointer-events: none;
+    left: 50px;
+    top: 0;
+    line-height: 40px;
+}
+
+#auth_form .auth_profile_image 
+{
+    width: 380px;
+    height: 40px;
+    font-size:16px;
+    border: 1px solid #cccccc;
+    border-radius: 4px;
+    margin: 0 auto;
+}
+
+#auth_form .auth_profile_image .auth_form_input {
+    position: absolute;
+    top: 0;
+    left: 0;
+    opacity: 0;
+    width: 100%;
 }
 
 #auth_form .auth_button {
