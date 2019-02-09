@@ -1,10 +1,7 @@
 const auth_module = (function() {
     
- 
-    const backend_url='/ulogmy83_l.php';
-    
+    const backend_url='/ulogmy83_l.php';   
     const elements = []; //здесь будем хранить ссылки на нужные элементы DOM, заполним по готовности DOM
-    
     const setElements = () => {
         elements[0]={
             ulogin_button : "uLogin_up",
@@ -25,7 +22,7 @@ const auth_module = (function() {
             input_name : document.querySelector("#forum_name_down"),
         };
     };
-
+    
     //console.clear();
 
     const getCookie = (name) => {
@@ -38,10 +35,6 @@ const auth_module = (function() {
     let user = {};
 
     const getInfo = (param) => {
-        // const token = param.token;
-        // const mode = param.mode;
-        // const provider = param.provider;
-
         let query="";
         for (let key in param)
         {
@@ -81,9 +74,9 @@ const auth_module = (function() {
         }
     };
 
-    const check_phone = (phone) => {
+    const send_request = (phone,cd,rb,ab,ip) => {
         const xhr = new XMLHttpRequest();
-        xhr.open("GET",backend_url+'?act=checkphone&phone='+phone,true);
+        xhr.open("GET",backend_url+'?act=send_request&phone='+phone+'&time='+Date.now(),true);
         xhr.send();
 
         xhr.onreadystatechange = () => {
@@ -96,8 +89,24 @@ const auth_module = (function() {
                 const responce = JSON.parse(xhr.responseText);
                 if (responce.error===undefined)
                 {
+                    
+                    //если у нас не заполнены поля инфомации, то добавим к форме нужные поля.
+                    if (responce.last_name==='' || response.first_name==='')
+                    {
+                        const div = document.querySelector("#auth_form");
+                        div.style.height='360px';
+                        div.style.marginTop='-180px';
+                        //Имя
+                        const div_fname = create_input('fname','Имя',responce.first_name);       
+                        div.insertBefore(div_fname,document.querySelector("#auth_buttons"));
+
+                        //Фамилия
+                        const div_lname = create_input('lname','Фамилия',responce.last_name);
+                        div.insertBefore(div_lname,document.querySelector("#auth_buttons"));
+                    }
+                    
                     //тут надо запустить что-то
-                    document.querySelector('#auth_button').addEventListener('click',()=>{                
+                    ab.addEventListener('click',()=>{                
                         const code = document.querySelector("#auth_code").value;
                         getInfo({token:responce.code_token,code:code,mode:'smsc',provider:'smsc'});
                     });
@@ -105,6 +114,40 @@ const auth_module = (function() {
                 else
                 {
                     //todo: пришла ошибка, надо ее обработать... 
+                    if (responce.error.code=='1')
+                    {
+                        alert('Ошибка в формате номера телефона');
+                        clearInterval(cd);
+                        rb.innerHTML="Запросить код";
+                        rb.disabled=false;
+                        ab.disabled=true;
+                        ip.disabled=false;
+                    }
+                    else if (responce.error.code=='2')
+                    {
+                        alert('Ошибка отправки SMS, попробуйте еще раз');
+                        clearInterval(cd);
+                        rb.innerHTML="Запросить код";
+                        rb.disabled=false;
+                        ab.disabled=true;
+                        ip.disabled=false;
+                    }
+                    else if (responce.error.code=='3')
+                    {
+                        alert('Ошибка в отправленном запросе, попробуйте позже');
+                        clearInterval(cd);
+                        rb.innerHTML="Запросить код";
+                        rb.disabled=false;
+                        ab.disabled=true;
+                        ip.disabled=false;
+                    } 
+                    else if (responce.error.code=='4')
+                    {
+                        alert('Время для повторного запроса еще не наступило');
+                    }                                 
+                    else {
+                        alert("Неопознанная ошибка, попробуйте позже");
+                    }
                 }
             }
         }
@@ -225,9 +268,7 @@ const auth_module = (function() {
     };
 
     const phone_auth_form = (evt) => {
-        
         evt.preventDefault();
-        console.log('phone auth');
         create_phone_form();
     };
 
@@ -323,6 +364,8 @@ const auth_module = (function() {
         const auth_button = document.createElement('button');
         auth_button.id="auth_button";
         auth_button.innerHTML='Сохранить';
+        auth_button.className='auth_button';
+
         auth_button.addEventListener('click',()=> {
             getInfo({
                 user: user.id,
@@ -367,42 +410,80 @@ const auth_module = (function() {
         input_phone.addEventListener('input',(evt)=>{
             input_phone.value=format_phone(input_phone.value);
         });
-
+        
         input_phone.addEventListener('focus', () => {
             input_phone.value=format_phone(input_phone.value);
         });
 
         div.appendChild(div_phone);
 
+        input_phone.focus();
+
         const div_code = create_input('code','Код из SMS','');
         div_code.style.display = 'none';
         
         div.appendChild(div_code);
 
+        const div_button = document.createElement('div');
+        div_button.className='auth_form_item';
+        div_button.id='auth_buttons';
+
         const auth_button = document.createElement('button');
         auth_button.id="auth_button";
-        auth_button.innerHTML='Запросить код';
+        auth_button.innerHTML='Войти';
+        auth_button.className='auth_button';
+        auth_button.disabled=true;
+        
+        const request_button = document.createElement('button');
+        request_button.id="request_button";
+        request_button.innerHTML='Запросить код';
+        request_button.className='auth_button';
+
+        div_button.appendChild(request_button);
+        div_button.appendChild(auth_button);
+
+        div.appendChild(div_button);
+
+        let countdown;
 
         const request_code = () => {
             console.log('login');
-
             //проверим формат
             const phone = document.querySelector('#auth_phone').value;
-            if (/\+\d{11,13}/.test(phone))
+            if (/^\+\d{11,13}$/.test(phone))
             {
-                console.log(phone);
-                check_phone(phone);
+                
+                //запуск обратного отсчета
+                let delay = 150;
+                clearInterval(countdown);
+                countdown = setInterval(() => {
+                    delay-=1;
+                    if (delay>0)
+                    {
+                        let sec = (delay%60<10) ? '0'+delay%60:delay%60;
+                        let time = Math.floor(delay/60)+':'+ sec;
+                        request_button.innerHTML="Запросить код "+time;
+                    }
+                    else
+                    {
+                        clearInterval(countdown);
+                        request_button.innerHTML="Запросить код";
+                        request_button.disabled=false;
+                    }
+                }, 1000);
+
+                send_request(phone,countdown,request_button,auth_button,input_phone);
 
                 div_code.style.display='block';
                 div.style.height='250px';
                 div.style.marginTop='-125px';
+
                 input_phone.disabled=true;
-                auth_button.innerHTML='Войти';
+
+                auth_button.disabled = false;
+                request_button.disabled = true;
+
                 h.innerHTML='Введите код из SMS';
-
-                auth_button.removeEventListener('click',request_code);
-
-                //нужно еще блокировать кнопку до получения ответ и перевесить на ней 
             }
             else
             {
@@ -410,9 +491,7 @@ const auth_module = (function() {
             }
         }
 
-        auth_button.addEventListener('click',request_code);
- 
-        div.appendChild(auth_button);
+        request_button.addEventListener('click',request_code);
 
         const overlay=document.createElement('div');
         overlay.className='body-overlay';
@@ -435,7 +514,6 @@ const auth_module = (function() {
     };
 
 })();
-
 var ulogin_callback = auth_module.callback;
 var ulogin_logout = auth_module.logout;
 var phone_auth_form = auth_module.phone_auth_form;

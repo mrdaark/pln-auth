@@ -103,9 +103,20 @@ if (isset($_GET['act']))
             echo json_encode(['t'=>$_COOKIE['auth_token']]);
             die();
         break;
-        case 'checkphone':
+        case 'send_request':
         {
             //todo: нужно добавить проверку номера
+            if (!preg_match("/\d{11,13}$/",$_GET['phone']))
+            {
+                echo json_encode(['error'=>['code'=>1,'text'=>'error format number']]);
+                die();
+            }
+
+            if (!(isset($_GET['time'])&&is_numeric($_GET['time'])&&($_GET['time']>0)))
+            {
+                echo json_encode(['error'=>['code'=>3,'text'=>'error request']]);
+                die();
+            }
 
             $code="";
             for ($i = 0; $i<5; $i++) 
@@ -113,31 +124,45 @@ if (isset($_GET['act']))
                 $code.= mt_rand(0,9);
             }
 
+            //проверим что такой номер есть в базе
+            $r = $db->query("SELECT * FROM forum_user WHERE provider='smsc' AND identity='".$db->real_escape_string($_GET['phone'])."'");
+            $id=0;
+            $last_name="";
+            $first_name="";
+
+            $current_time=time();
+
+            if ($r->num_rows)
+            {
+                $res = $r->fetch_assoc();
+
+                if ($res['auth_time']!=0&&$res['auth_time']+150>$current_time)
+                {
+                    echo json_encode(['error'=>['code'=>4,'text'=>'time for re-request has not come']]);
+                    die();
+                }
+
+                $id=$res['id'];
+                $last_name=$res['last_name'];
+                $first_name=$res['first_name'];
+            }
+
             if (send_sms($_GET['phone'],$code))
             {
-                //сохранить куда-нибудь, но сначала проверим что такого номера еще нет в базе.
-                $r = $db->query("SELECT * FROM forum_user WHERE provider='smsc' AND identity='".$db->real_escape_string($_GET['phone'])."'");
-                $id=0;
-                $last_name="";
-                $first_name="";
-                if ($r->num_rows)
+                if ($id!=0)
                 {
-                    $res = $r->fetch_assoc();
-                    $id=$res['id'];
-                    $last_name=$res['last_name'];
-                    $first_name=$res['first_name'];
-                    $db->query("UPDATE forum_user SET uid='".$code."' WHERE id='".$res['id']."'");
+                    $db->query("UPDATE forum_user SET uid='".$code."',auth_time='".$current_time."' WHERE id='".$res['id']."'");
                 }
                 else
                 {
-                    $db->query("INSERT INTO forum_user (provider,network,uid,identity) VALUES ('smsc','smsc.ru','".$code."','".$db->real_escape_string($_GET['phone'])."')");
+                    $db->query("INSERT INTO forum_user (provider,network,uid,identity,auth_time) VALUES ('smsc','smsc.ru','".$code."','".$db->real_escape_string($_GET['phone'])."','".$current_time."')");
                     $id = $db->insert_id;
                 }
                 
                 echo json_encode(arr2UTF8(['code_token'=>sha1('smsc'.$id.$code),'id'=>$id,'code'=>$code,'first_name'=>$first_name,'last_name'=>$last_name]));
                 die();
             }
-            echo json_encode(['error'=>'send sms error']);
+            echo json_encode(['error'=>['code'=>2,'text'=>'error send sms']]);
             die();
         }
     }

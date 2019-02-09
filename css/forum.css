@@ -71,6 +71,7 @@
 #auth_form .auth_form_item {
     position: relative;
     margin-bottom: 10px;
+    text-align: center;
 }
 
 #auth_form .auth_form_label {
@@ -103,10 +104,9 @@
     color: #a0030d;
 }
 
-#auth_form #auth_button {
+#auth_form .auth_button {
     height: 40px;
     line-height: 40px;
-    width: 120px;
     text-align: center;
     border:none;
     border-radius: 4px;
@@ -114,13 +114,18 @@
     color:white;
     font-weight: bold;
     font-size:16px;
-    margin: 10px auto;
-    display: block;
+    margin: 10px;
+    padding: 0 20px;
+    display: inline-block;
 }
 
-#auth_form #auth_button:hover {
+#auth_form .auth_button:hover {
     background: #b52931;
     box-shadow: 0 0 2px #a0030d;
+}
+
+#auth_form .auth_button:disabled {
+    background: #969696;
 }
 
 .body-overlay {
