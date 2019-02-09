@@ -76,7 +76,7 @@ const auth_module = (function() {
 
     const send_request = (phone,cd,rb,ab,ip) => {
         const xhr = new XMLHttpRequest();
-        xhr.open("GET",backend_url+'?act=send_request&phone='+phone+'&time='+Date.now(),true);
+        xhr.open("GET",backend_url+'?act=send_request&phone='+phone.replace('+','')+'&time='+Date.now(),true);
         xhr.send();
 
         xhr.onreadystatechange = () => {
@@ -89,11 +89,17 @@ const auth_module = (function() {
                 const responce = JSON.parse(xhr.responseText);
                 if (responce.error===undefined)
                 {
+                    const div = document.querySelector("#auth_form");
+                    const div_code = document.querySelector("#auth_form_code");
                     
+                    div_code.style.display='block';
+                    div.style.height='250px';
+                    div.style.marginTop='-125px';
+                    
+                    let not_all_info=false;
                     //если у нас не заполнены поля инфомации, то добавим к форме нужные поля.
-                    if (responce.last_name==='' || response.first_name==='')
+                    if (responce.last_name==='' || responce.first_name==='')
                     {
-                        const div = document.querySelector("#auth_form");
                         div.style.height='360px';
                         div.style.marginTop='-180px';
                         //Имя
@@ -103,12 +109,42 @@ const auth_module = (function() {
                         //Фамилия
                         const div_lname = create_input('lname','Фамилия',responce.last_name);
                         div.insertBefore(div_lname,document.querySelector("#auth_buttons"));
+
+                        not_all_info=true;
                     }
                     
-                    //тут надо запустить что-то
                     ab.addEventListener('click',()=>{                
                         const code = document.querySelector("#auth_code").value;
-                        getInfo({token:responce.code_token,code:code,mode:'smsc',provider:'smsc'});
+                        const fname_input = document.querySelector("#auth_fname");
+                        const lname_input = document.querySelector("#auth_lname"); 
+
+                        let fname='';
+                        let lname='';
+
+                        if (not_all_info) {
+                            if (fname_input===null || lname_input===null)
+                            {
+                                alert("Ошибка формы ввода данных. Перезагрузите страницу.");
+                                return false;
+                            }
+                            
+                            fname = fname_input.value;
+                            lname = lname_input.value;
+
+                            if (fname==='' || lname==='')
+                            {
+                                alert('Необходимо ввести данные');
+                                return false;
+                            }
+                        }
+
+                        if (!/^\d{5}$/.test(code))
+                        {
+                            alert('Код из SMS должен состоять из 5 цифр');
+                            return false;
+                        }
+                        
+                        getInfo({token:responce.code_token,code:code,mode:'smsc',provider:'smsc', first_name:fname, last_name:lname});
                     });
                 }
                 else
@@ -144,6 +180,7 @@ const auth_module = (function() {
                     else if (responce.error.code=='4')
                     {
                         alert('Время для повторного запроса еще не наступило');
+                        ab.disabled=true;
                     }                                 
                     else {
                         alert("Неопознанная ошибка, попробуйте позже");
@@ -163,7 +200,17 @@ const auth_module = (function() {
 
             for (let i=0;i<elements.length;i+=1)
             {
-                elements[i].profile_link.href=user.identity;
+                if (user.network!=='smsc.ru' && user.network!=='facebook' && user.profile!=='')
+                {
+                    elements[i].profile_link.href=user.profile;
+                }
+                else
+                {
+                    elements[i].profile_link.href="javascript:void(0);"; 
+                    elements[i].profile_link.onclick="return false;";
+                    elements[i].profile_link.target="";
+                }
+                
                 elements[i].profile_link.innerHTML=user.first_name+' '+user.last_name;
                 elements[i].ulogin_info.style.display="block";
         
@@ -298,9 +345,6 @@ const auth_module = (function() {
     };
 
     const remove_form = () => {
-
-        console.log(document.querySelector("#auth_form"));
-
         if (document.querySelector("#auth_form")!==null)
         {
             document.querySelector("#auth_form").remove();
@@ -473,10 +517,6 @@ const auth_module = (function() {
                 }, 1000);
 
                 send_request(phone,countdown,request_button,auth_button,input_phone);
-
-                div_code.style.display='block';
-                div.style.height='250px';
-                div.style.marginTop='-125px';
 
                 input_phone.disabled=true;
 

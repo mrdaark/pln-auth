@@ -1231,7 +1231,7 @@ function forum_article($id,$subj="1",$time="1",$announce="0", $header="1", $prim
 //Если есть комменты  - выводим их
             if ($forum_count>0){
                 //$SQL="SELECT id,name,email,subject,text,date_format(time, '%d.%m.%Y %H:%i') as time, inet_ntoa(ip) as ip, inet_ntoa(ip_orig) as ip_orig from forum WHERE topic='$id' ORDER BY forum.time";
-                $SQL = "SELECT f.id,name,email,subject,text,date_format(time, '%d.%m.%Y %H:%i') as time, inet_ntoa(ip) as ip, inet_ntoa(ip_orig) as ip_orig,fu.first_name AS firstname, fu.last_name AS lastname,fu.identity, f.user_id from forum AS f LEFT JOIN forum_user AS fu ON (f.user_id=fu.id) WHERE topic='".$id."'  ORDER BY f.time";
+                $SQL = "SELECT f.id,name,email,subject,text,date_format(time, '%d.%m.%Y %H:%i') as time, inet_ntoa(ip) as ip, inet_ntoa(ip_orig) as ip_orig,fu.first_name AS firstname, fu.last_name AS lastname,fu.identity,fu.profile,fu.image,f.user_id from forum AS f LEFT JOIN forum_user AS fu ON (f.user_id=fu.id) WHERE topic='".$id."'  ORDER BY f.time";
                 $r=runSQL($SQL);
 
                 while ($d=mysql_fetch_array($r))
@@ -1249,8 +1249,17 @@ function forum_article($id,$subj="1",$time="1",$announce="0", $header="1", $prim
 
                     if ($d['user_id']!=0)
                     {
-                        $forum_user = '<a href="'.$d['identity'].'" target="_blank" rel="nofollow">'.$d['firstname'].' '.$d['lastname'].'</a>';
-                        $forum_img = '<img src="'.$user['image'].'" class="forum_avatar">';
+                        $user_target=' target="_blank"';
+                        $user_link=$d['profile'];
+                        if ($d['network']=='smsc.ru'||$d['network']=='facebook'||$d['profile']=='')
+                        {
+                            $user_link="javascript:void(0);";
+                            $user_target="";
+                        }
+                        $forum_user = '<a href="'.$user_link.'"'.$user_target.' rel="nofollow">'.$d['firstname'].' '.$d['lastname'].'</a>';
+                        
+                        
+                        $forum_img = '<img src="'.$d['image'].'" class="forum_avatar">';
                     }
                     else
                     {

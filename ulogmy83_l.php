@@ -46,11 +46,31 @@ if (isset($_GET['act']))
                 case 'smsc':
                     //получим пользователя
                     $r = $db->query("SELECT id,first_name,last_name,identity,profile,image,network FROM forum_user WHERE SHA1(CONCAT(provider,id,uid))='".$db->real_escape_string($_GET['token'])."' AND uid='".$db->real_escape_string($_GET['code'])."'");
-                    //echo "SELECT * FROM forum_user WHERE SHA1(CONCAT(provider,id,'".$db->real_escape_string($_GET['code'])."'))='".$db->real_escape_string($_GET['token'])."' AND uid='".$db->real_escape_string($_GET['code'])."'";
-                    
+                    //echo "SELECT * FROM forum_user WHERE SHA1(CONCAT(provider,id,'".$db->real_escape_string($_GET['code'])."'))='".$db->real_escape_string($_GET['token'])."' AND uid='".$db->real_escape_string($_GET['code'])."'";      
+
                     if ($r->num_rows)
                     {
                         $res = $r->fetch_assoc();
+                        $update="UPDATE forum_user SET uid='',";
+                        if (isset($_GET['first_name']) && trim($_GET['first_name']!=''))
+                        {
+                            $update.="first_name='".$db->real_escape_string(trim($_GET['first_name']))."',";
+                        }
+                        if (isset($_GET['last_name']) && trim($_GET['last_name']!=''))
+                        {
+                            $update.="last_name='".$db->real_escape_string(trim($_GET['last_name']))."',";
+                        }
+
+                        //добавить удаления старого кода из sms
+                        if ($update!='')
+                        {
+                            $update=substr($update,0,-1)." WHERE id='".$res['id']."'";
+                            $db->query($update);
+                            $r = $db->query("SELECT id,first_name,last_name,identity,profile,image,network FROM forum_user WHERE id='".$res['id']."'");                            
+                            $res=$r->fetch_assoc();
+                        }
+
+                                                //оставим пока на всякий случай...
                         if (trim($res['first_name'])=='' || trim($res['last_name'])=='')
                         {
                             setcookie("profile_token",sha1($res['id'].$res['identity'].'profile_xer'),time()+86400);
@@ -61,7 +81,6 @@ if (isset($_GET['act']))
                         }
                         
                         $res['token']=sha1($res['identity'].$res['network']);
-                        unset($res['network']);
                         echo json_encode(arr2UTF8($res));
                         die();
                     }
@@ -147,7 +166,7 @@ if (isset($_GET['act']))
                 $first_name=$res['first_name'];
             }
 
-            if (send_sms($_GET['phone'],$code))
+            if (send_sms_code($_GET['phone'],$code))
             {
                 if ($id!=0)
                 {
@@ -159,7 +178,7 @@ if (isset($_GET['act']))
                     $id = $db->insert_id;
                 }
                 
-                echo json_encode(arr2UTF8(['code_token'=>sha1('smsc'.$id.$code),'id'=>$id,'code'=>$code,'first_name'=>$first_name,'last_name'=>$last_name]));
+                echo json_encode(arr2UTF8(['code_token'=>sha1('smsc'.$id.$code),'id'=>$id,'first_name'=>$first_name,'last_name'=>$last_name]));
                 die();
             }
             echo json_encode(['error'=>['code'=>2,'text'=>'error send sms']]);
@@ -168,10 +187,16 @@ if (isset($_GET['act']))
     }
 }
 
-function send_sms($phone,$code)
+function send_sms_code($phone,$code)
 {
+    require_once("adminpln/inc/smsc_api.php");
     $message = 'Код подтверждения на сайте pln-pskov.ru: '.$code;
-    return true;
+    $res=send_sms($phone,$message);
+    if ($res[1]>0)
+    {
+        return true;
+    }
+    return false;
 }
 
 function getUserInfo ($user,&$db) {
