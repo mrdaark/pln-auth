@@ -1028,7 +1028,7 @@ function forum_article_form($id,$place_id)
     $user = [];
     $is_login = false;
     //нужно проверить что пользователь залогинен...
-    if (isset($_COOKIE['ulogin_token']) && ($_COOKIE['ulogin_token']!=''))
+    if (isset($_COOKIE['auth_token']) && ($_COOKIE['auth_token']!=''))
     {
 
         //echo "SELECT * FROM forum_user WHERE SHA1(CONCAT(identity,network))='".mysql_real_escape_string($_COOKIE['ulogin_token'])."'";

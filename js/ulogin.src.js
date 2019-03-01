@@ -40,13 +40,12 @@ const auth_module = (function() {
         {
             query+='&'+key+'='+param[key];
         }
-        
+
         const xhr = new XMLHttpRequest();
-        xhr.open("GET",backend_url+'?act=login'+query,true);
-        //xhr.open("GET",backend_url+'?act=login&provider='+provider+'&token='+token+'&mode='+mode,true);
-        //xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-        //xhr.send('token='+token+'&mode='+mode);
-        xhr.send();
+        xhr.open("POST",backend_url+'?act=login',true);
+        xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+        xhr.send(query);
+        //xhr.send();
 
         xhr.onreadystatechange = () => {
             if (xhr.readyState!==4) {return;}
@@ -66,7 +65,23 @@ const auth_module = (function() {
                         switch_state ('login');
                     }
                 } else {
-                    console.log('ошибка токена',user.error);
+                    console.log('ошибка',user.error);
+                    switch (user.error.code)
+                    {
+                        case 102:
+                            if (user.error.time===4294967295)
+                            {
+                                alert('Пользователь блокирован навсегда');
+                            }
+                            else
+                            {
+                                alert('Пользователь блокирован до '+ new Date(user.error.time * 1000).toLocaleString('ru',{ day: 'numeric', month: 'long', year:'numeric', hour:'numeric', minute: 'numeric',
+                                second: 'numeric', timezone:'MSK'})); 
+                            }
+                            
+                        break;
+                    }
+
                     switch_state ('logout');
                 }                
                 
@@ -76,8 +91,9 @@ const auth_module = (function() {
 
     const send_request = (phone,cd,rb,ab,ip) => {
         const xhr = new XMLHttpRequest();
-        xhr.open("GET",backend_url+'?act=send_request&phone='+phone.replace('+','')+'&time='+Date.now(),true);
-        xhr.send();
+        xhr.open("POST",backend_url+'?act=send_request',true);
+        xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+        xhr.send('phone='+phone.replace('+','')+'&time='+Date.now());
 
         xhr.onreadystatechange = () => {
             if (xhr.readyState!==4) {return;}
@@ -143,13 +159,28 @@ const auth_module = (function() {
                             alert('Код из SMS должен состоять из 5 цифр');
                             return false;
                         }
+
+                        const query = {
+                            phone:phone.replace('+',''),
+                            code:code,
+                            mode:'sms'
+                        };
+
+                        if (fname !== '')
+                        {
+                            query.first_name=fname;
+                        }
+
+                        if (lname !== '')
+                        {
+                            query.last_name=lname;
+                        }
                         
-                        getInfo({token:responce.code_token,code:code,mode:'smsc',provider:'smsc', first_name:fname, last_name:lname});
+                        getInfo(query);
                     });
                 }
                 else
                 {
-                    //todo: пришла ошибка, надо ее обработать... 
                     if (responce.error.code=='1')
                     {
                         alert('Ошибка в формате номера телефона');
@@ -305,7 +336,7 @@ const auth_module = (function() {
         {
             //console.log('у нас есть токен');
             //в таком случае делаем сразу callback
-            getInfo({token:token,mode:'auth',provider:'local'});
+            getInfo({mode:'auth'});
         }
         else
         {

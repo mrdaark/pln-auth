@@ -8,6 +8,436 @@ function runSQL($r) { return; }
 
 require_once ("mysql.php");
 
+$authForum=new authForum([
+    'mysql_host'=>$mysql_host,
+    'mysql_username'=>$mysql_username,
+    'mysql_password'=>$mysql_password,
+    'mysql_database'=>$mysql_database,
+    ]);
+
+$actions = ['login','logout','update_profile','upload_image','send_request'];
+
+if ((isset($_REQUEST['act'])) && (in_array($_REQUEST['act'],$actions)))
+{
+    $authForum->$_REQUEST['act']();
+}
+else
+{
+    $authForum->wrongaction();
+}
+
+class authForum {
+    var $db;
+    var $user;
+    //методы авторизации
+    var $method = ['cookie','ulogin','sms'];
+    var $fields = ['provider','network','profile','uid','first_name','last_name','identity','image','auth_time'];
+    var $salt = 'bDWzMZQW2Vvvv4KA6sZF'; //солим хеши
+
+    public function __construct(array $config)
+    {
+        $this->db = new mysqli($config['mysql_host'], $config['mysql_username'], $config['mysql_password'], $config['mysql_database']);
+        $this->db->query("set session character_set_server=cp1251;");
+        $this->db->query("set session character_set_database=cp1251;");
+        $this->db->query("set session character_set_connection=cp1251;");
+        $this->db->query("set session character_set_results=cp1251;");
+        $this->db->query("set session character_set_client=cp1251;");
+    }
+    
+    public function login() {
+        switch ($_POST['mode'])
+        {
+            case 'ulogin':
+                $s = file_get_contents('http://ulogin.ru/token.php?token='.$_POST['token'].'&host='.$_SERVER['HTTP_HOST']);
+                $user = json_decode($s, true);
+                if (!isset($user['error']))
+                {
+                    $this->user=$user;
+                    $this->ulogin();
+                    $this->getUser('ulogin');
+                }
+                else
+                {
+                    echo $s;
+                }
+            break;
+
+            case 'sms':
+                $this->getUser('sms');    
+            break;
+
+            default:
+                $this->getUser('cookie');
+            break;
+        }
+    }
+
+    public function send_request()
+    {
+        if (!preg_match("/\d{11,13}$/",$_POST['phone']))
+        {
+            echo json_encode(['error'=>['code'=>1,'text'=>'error format number']]);
+            return false;
+        }
+
+        if (!(isset($_POST['time'])&&is_numeric($_POST['time'])&&($_POST['time']>0)))
+        {
+            echo json_encode(['error'=>['code'=>3,'text'=>'error request']]);
+            return false;
+        }
+
+        $code="";
+        for ($i = 0; $i<5; $i++) 
+        {
+            $code.= mt_rand(0,9);
+        }
+
+        //проверим что такой номер есть в базе
+        $r = $this->db->query("SELECT * FROM forum_user WHERE provider='smsc' AND identity='".$this->db->real_escape_string($_POST['phone'])."'");
+        $id=0;
+        $last_name="";
+        $first_name="";
+
+        $current_time=time();
+
+        if ($r->num_rows)
+        {
+            $res = $r->fetch_assoc();
+
+            if ($res['auth_time']!=0&&$res['auth_time']+150>$current_time)
+            {
+                echo json_encode(['error'=>['code'=>4,'text'=>'time for re-request has not come']]);
+                return false;
+            }
+
+            $id=$res['id'];
+            $last_name=$res['last_name'];
+            $first_name=$res['first_name'];
+        }
+
+        if ($this->send_sms_code($_POST['phone'],$code))
+        {
+            if ($id!=0)
+            {
+                $this->db->query("UPDATE forum_user SET uid='".sha1($code)."',auth_time='".$current_time."' WHERE id='".$res['id']."'");
+            }
+            else
+            {
+                $this->db->query("INSERT INTO forum_user (provider,network,uid,identity,auth_time) VALUES ('smsc','smsc.ru','".sha1($code)."','".$this->db->real_escape_string($_POST['phone'])."','".$current_time."')");
+                $id = $this->db->insert_id;
+            }
+            
+            echo json_encode($this->arr2UTF8(['id'=>$id,'first_name'=>$first_name,'last_name'=>$last_name]));
+            return true;
+        }
+        echo json_encode(['error'=>['code'=>2,'text'=>'error send sms']]);
+        return false;
+    }
+
+    public function logout($result=true) {
+        setcookie('auth_token');
+        if ($result)
+        {
+            echo json_encode(['t'=>$_COOKIE['auth_token']]);
+        }
+        return;
+    }
+
+    public function update_profile() {
+        if ($this->isLogin())
+        {
+            if ((isset($_POST['first_name']) && trim($_POST['first_name']!='')) ||(isset($_POST['last_name']) && trim($_POST['last_name']!='')))
+            {
+                $this->user['first_name']=$this->db->real_escape_string(mb_convert_encoding(trim($_POST['first_name']),'CP-1251','UTF-8'));
+                $this->user['last_name']=$this->db->real_escape_string(mb_convert_encoding(trim($_POST['last_name']),'CP-1251','UTF-8'));
+                $this->saveUser();
+                $this->getUser('cookie');
+                return true;
+            }            
+        }
+        echo json_encode(['error'=>['code'=>101,'text'=>'user not login']]);
+        return false;
+    }
+
+    //загрузка картинки профиля
+    public function upload_image() {
+        if ($this->isLogin())
+        {
+            $path = realpath(__DIR__ . "/pictures/forum/").'/';
+            if (isset($_FILES['photo']))
+            {
+                $ext_list=['gif','jpg','jpeg','png'];
+                $fn = $_FILES['photo']['name'];
+                $ext = strtolower(pathinfo($fn, PATHINFO_EXTENSION));
+                if( in_array($ext,$ext_list) )
+                {
+                    $image=$this->user['id'].'_'.time().'.'.$ext;
+
+                    //todo: сделать уменьшение размера и кроп
+                    if (!move_uploaded_file($_FILES['photo']['tmp_name'],$path.$image))
+                    {
+                        echo json_encode(['error'=>['code'=>'4','text'=>'error loading image on server']]);
+                        return false;
+                    }
+
+                    if (file_exists($path.$image)) {
+                        $this->db->query("UPDATE forum_user SET image='/pictures/forum/".$image."' WHERE id='".$this->user['id']."'");
+                        echo json_encode(['image'=>'/pictures/forum/'.$image]);
+                        return true;
+                    }
+                    else
+                    {
+                        echo json_encode(['error'=>['code'=>'4','text'=>'error loading image on server']]);
+                        return false;
+                    }
+                }
+                else
+                {
+                    echo json_encode(['error'=>['code'=>'3','text'=>'wrong image format']]);
+                    return false;
+                }
+            }
+            else
+            {
+                echo json_encode(['error'=>['code'=>'2','text'=>'no image uploaded']]);
+                return false;
+            }
+        }
+       
+        echo json_encode(['error'=>['code'=>101,'text'=>'user not login']]);
+        return false;
+    }
+
+    public function wrongaction() {
+        echo json_encode(['error'=>['code'=>404,'text'=>'wrong request']]);
+        return false;
+    }
+
+    protected function isLogin()
+    {
+        if (isset($_COOKIE['auth_token']) && $_COOKIE['auth_token']!='')
+        {
+            $r = $this->db->query("SELECT id,first_name,last_name,image,network,profile,identity,auth_time FROM forum_user WHERE SHA1(CONCAT(`identity`,`network`,`auth_time`,'".$this->salt."'))='".$this->db->real_escape_string($_COOKIE['auth_token'])."'");
+            if ($r->num_rows)
+            {
+                $this->user = $r->fetch_assoc();
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    protected function ulogin()
+    {
+        if (isset($this->user['identity']) && $this->user['identity']!='' && isset($this->user['network']) &&$this->user['network']!='' )
+        {
+            foreach ($this->user as $k=>$v)
+            {
+                $this->user[$k]=$this->db->real_escape_string(mb_convert_encoding ($v,'CP-1251','UTF-8'));    
+            }
+
+            $this->user['auth_time']=time();
+            
+            $r=$this->db->query("SELECT id FROM forum_user WHERE SHA1(CONCAT(identity,network))='".sha1($this->user['identity'].$this->user['network'])."'");
+            if ($r->num_rows)
+            {
+                //обновляем поля
+                $res = $r->fetch_assoc();
+                $this->user['id']=$res['id'];
+                $this->user['image']=$this->saveUloginPhoto();
+                $this->saveUser();
+            }
+            else
+            {
+                //создаем пользователя
+                $this->saveUser();
+                $this->user['image']=$this->saveUloginPhoto();
+                $this->saveUser();
+            }
+        }
+    }
+
+
+    protected function getUser($method)
+    {
+        $query="";
+        switch ($method)
+        {
+            case 'cookie':
+                //todo: переделать на использоване isLogin
+                if (isset($_COOKIE['auth_token']) && $_COOKIE['auth_token']!='')
+                {
+                    $query.="SHA1(CONCAT(`identity`,`network`,`auth_time`,'".$this->salt."'))='".$this->db->real_escape_string($_COOKIE['auth_token'])."'";
+                }
+            break;
+
+            case 'sms':
+                if (preg_match("/\d{11,13}$/",$_POST['phone']) && preg_match("/\d{5}$/",$_POST['code']))
+                {
+                    $query.="identity='".$this->db->real_escape_string($_POST['phone'])."' AND uid='".sha1($_POST['code'])."'";
+                }
+            break;
+
+            case 'ulogin':
+                if (isset($this->user['identity']) && $this->user['identity']!='' && isset($this->user['network']) &&$this->user['network']!='' )
+                {
+                    $query.="id ='".$this->user['id']."'";
+                }
+                
+            break;
+        }
+
+        if ($query!='')
+        {
+            $query="SELECT id,first_name,last_name,image,network,profile,identity,auth_time,blocked FROM forum_user WHERE ".$query;
+        }
+        else
+        {    
+            echo json_encode(['error'=>['code'=>103,'text'=>'user not login']]);
+            return false;
+        }
+
+        //echo $query;
+
+        $r = $this->db->query($query);
+        if ($r->num_rows)
+        {          
+            $this->user = $r->fetch_assoc();
+
+            switch ($method)
+            {
+                case 'sms':
+                    if ((isset($_POST['first_name']) && trim($_POST['first_name']!='')) ||(isset($_POST['last_name']) && trim($_POST['last_name']!='')))
+                    {
+                        $this->user['first_name']=$this->db->real_escape_string(mb_convert_encoding(trim($_POST['first_name']),'CP-1251','UTF-8'));
+                        $this->user['last_name']=$this->db->real_escape_string(mb_convert_encoding(trim($_POST['last_name']),'CP-1251','UTF-8'));
+                        $this->saveUser();
+                    }
+                break;
+            }
+
+            if ($this->user['blocked'] > time())
+            {
+                $this->logout(false);
+                echo json_encode(['error'=>['code'=>102,'text'=>'user blocked','time'=>$this->user['blocked']]]);
+                return false;   
+            }
+
+            if ($method!=='cookie') {
+                setcookie("auth_token",sha1($this->user['identity'].$this->user['network'].$this->user['auth_time'].$this->salt),time()+2592000);
+            }
+
+            //не надо это видеть...
+            unset($this->user['identity']);
+            unset($this->user['auth_time']);
+            unset($this->user['blocked']);
+
+            echo json_encode($this->arr2UTF8($this->user));
+            return true;
+        }
+        
+        echo json_encode(['error'=>['code'=>101,'text'=>'user not login']]);
+        return false;
+    }
+
+    protected function arr2UTF8($arr)
+    {
+        $ret = [];
+        foreach ($arr as $k=>$v)
+        {
+            $ret[$k]=mb_convert_encoding($v,'UTF-8','CP-1251');
+        }
+        return $ret;
+    }
+
+    protected function saveUser()
+    {
+        $query="";
+        foreach ($this->fields as $v)
+        {
+            if (isset($this->user[$v]))
+            {
+                $query.=$v."='".$this->user[$v]."',";
+            }
+        }
+
+        if (isset($this->user['id']) && is_numeric($this->user['id']) && $this->user['id']!=0)
+        {
+            $query="UPDATE forum_user SET ".substr($query,0,-1)." WHERE id='".$this->user['id']."'";
+        }
+        else
+        {
+            $query="INSERT INTO forum_user SET ".substr($query,0,-1);
+        }
+
+        $this->db->query($query);
+
+        //echo $query."\n\n\n";
+
+        if ( !(isset($this->user['id']) && is_numeric($this->user['id']) && $this->user['id']!=0) )
+        {
+            $this->user['id']=$this->db->insert_id;
+        }
+    }
+
+    protected function saveUloginPhoto() 
+    {
+        
+        $path = realpath(__DIR__ . "/pictures/forum/").'/';
+        if (isset($this->user['photo']) && $this->user['photo']!='')
+        {
+            //получим картинку, сохраним в темп
+            $tmp = $path.time()."___".$this->user['id'];
+            
+            file_put_contents($tmp,file_get_contents($this->user['photo']));
+            $type = exif_imagetype($tmp);
+            
+            switch ($type)
+            {
+                case IMAGETYPE_GIF:
+                    $name = $this->user['id'].'_'.time().'.gif';
+                break;
+                case IMAGETYPE_JPEG:
+                    $name = $this->user['id'].'_'.time().'.jpg';
+                break;
+                case IMAGETYPE_PNG:
+                    $name = $this->user['id'].'_'.time().'.png';
+                break;
+                case IMAGETYPE_BMP:
+                    $name = $this->user['id'].'_'.time().'.bmp';
+                break;
+                default:
+                    $name='nopic.png';
+                break;
+            }
+    
+            if ($name != 'nopic.png') {
+                rename ($tmp,$path.$name);
+            }
+            return '/pictures/forum/'.$name;
+    
+        }
+        return '/pictures/forum/'.'nopic.png';
+    }
+
+    //отправка sms
+    protected function send_sms_code($phone,$code)
+    {
+        require_once("adminpln/inc/smsc_api.php");
+        $message = 'Код подтверждения на сайте pln-pskov.ru: '.$code;
+        $res=send_sms($phone,$message);
+        if ($res[1]>0)
+        {
+            return true;
+        }
+        return false;
+    }
+}
+
+
+
+
+/*
 $db = new mysqli($mysql_host, $mysql_username, $mysql_password, $mysql_database);
     
 $db->query("set session character_set_server=cp1251;");
@@ -403,3 +833,4 @@ function savePhoto($user)
     }
     return '/pictures/forum/'.'nopic.png';
 }
+*/

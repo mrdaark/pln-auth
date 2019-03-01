@@ -44,7 +44,7 @@ if ($dirs[1]=="post")
         if ($ri->num_rows)
         {
             $user = mysql_fetch_array($ri);
-            if ($_COOKIE['ulogin_token']==sha1($user['identity'].$user['network']))
+            if ($_COOKIE['auth_token']==sha1($user['identity'].$user['network'].$user['auth_time'].'bDWzMZQW2Vvvv4KA6sZF') && $user['blocked']<time())
             {
                 $is_login=true;
             }
