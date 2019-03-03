@@ -6,7 +6,7 @@
 //костыль чтобы не тянуть common.php
 function runSQL($r) { return; }
 
-require_once ("mysql.php");
+require_once ("../pln-pskov.ru/mysql.php");
 
 $authForum=new authForum([
     'mysql_host'=>$mysql_host,
@@ -173,8 +173,7 @@ class authForum {
                 {
                     $image=$this->user['id'].'_'.time().'.'.$ext;
 
-                    //todo: сделать уменьшение размера и кроп
-                    if (!move_uploaded_file($_FILES['photo']['tmp_name'],$path.$image))
+                    if (!image_crop($_FILES['photo']['tmp_name'],$path.$image))
                     {
                         echo json_encode(['error'=>['code'=>'4','text'=>'error loading image on server']]);
                         return false;
@@ -429,6 +428,33 @@ class authForum {
         if ($res[1]>0)
         {
             return true;
+        }
+        return false;
+    }
+
+    protected function image_crop($image,$target)
+    {
+        $h=$w=100;
+    
+        list( $sw,$sh ) = getimagesize( $image );
+    
+        $image_str = file_get_contents($image);
+        $src = imagecreatefromstring($image_str);
+    
+        $thumb = imagecreatetruecolor($w,$h);
+    
+        $hw=$sw;
+        if ($sw>$sh)
+        {
+        $hw=$sw;
+        }
+    
+        if (imagecopyresized($thumb,$src,0,0,0,0,$w,$h,$hw,$hw))
+        {
+            if (imagepng($thumb,$target) && file_exists($target))
+            {
+                return true;
+            }
         }
         return false;
     }
