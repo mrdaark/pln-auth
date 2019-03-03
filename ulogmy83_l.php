@@ -1,4 +1,6 @@
 <?php
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
 // ini_set('error_reporting', E_ALL);
 // ini_set('display_errors', 1);
 // ini_set('display_startup_errors', 1);
@@ -135,7 +137,8 @@ class authForum {
     }
 
     public function logout($result=true) {
-        setcookie('auth_token');
+        //setcookie('auth_token');
+        setcookie("auth_token",sha1($this->user['identity'].$this->user['network'].$this->user['auth_time'].$this->salt),time(),'/','.forumpln.ru');
         if ($result)
         {
             echo json_encode(['t'=>$_COOKIE['auth_token']]);
@@ -323,7 +326,7 @@ class authForum {
             }
 
             if ($method!=='cookie') {
-                setcookie("auth_token",sha1($this->user['identity'].$this->user['network'].$this->user['auth_time'].$this->salt),time()+2592000);
+                setcookie("auth_token",sha1($this->user['identity'].$this->user['network'].$this->user['auth_time'].$this->salt),time()+2592000,'/','.forumpln.ru');
             }
 
             //не надо это видеть...

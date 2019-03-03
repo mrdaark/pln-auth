@@ -1,26 +1,46 @@
 const auth_module = (function() {
+
+    let login=false;
     
     const backend_url='/ulogmy83_l.php';   
     const elements = []; //здесь будем хранить ссылки на нужные элементы DOM, заполним по готовности DOM
     const setElements = () => {
-        elements[0]={
-            ulogin_button : "uLogin_up",
-            ulogin_form : document.querySelector("#ulogin_form_up"),
-            ulogin_info : document.querySelector("#ulogin_info_up"),
-            ulogin_identity : document.querySelector("#ulogin_identity_up"),
-            profile_link: document.querySelector("#profile_link_up"),
-            forum_submit : document.querySelector("#forum_submit_up"),
-            input_name : document.querySelector("#forum_name_up"),
-        };
-        elements[1]={
-            ulogin_button : "uLogin_down",
-            ulogin_form : document.querySelector("#ulogin_form_down"),
-            ulogin_info : document.querySelector("#ulogin_info_down"),
-            ulogin_identity : document.querySelector("#ulogin_identity_down"),
-            profile_link: document.querySelector("#profile_link_down"),
-            forum_submit : document.querySelector("#forum_submit_down"),
-            input_name : document.querySelector("#forum_name_down"),
-        };
+        if (typeof mobile_version!=="undefined" && mobile_version===true)
+        {
+            elements[0]={
+                ulogin_button : "uLogin",
+                ulogin_form : document.querySelector("#ulogin_form"),
+                ulogin_info : document.querySelector("#ulogin_info"),
+                ulogin_identity : document.querySelector("#ulogin_identity"),
+                profile_link: document.querySelector("#profile_link"),
+                forum_submit : document.querySelector("#forum_submit"),
+                input_name : document.querySelector("#forum_name"),
+                text: document.querySelector("#forum_text"),
+            };      
+        }
+        else
+        {
+            elements[0]={
+                ulogin_button : "uLogin_up",
+                ulogin_form : document.querySelector("#ulogin_form_up"),
+                ulogin_info : document.querySelector("#ulogin_info_up"),
+                ulogin_identity : document.querySelector("#ulogin_identity_up"),
+                profile_link: document.querySelector("#profile_link_up"),
+                forum_submit : document.querySelector("#forum_submit_up"),
+                input_name : document.querySelector("#forum_name_up"),
+                text: document.querySelector("#forum_text_up"),
+            };
+            elements[1]={
+                ulogin_button : "uLogin_down",
+                ulogin_form : document.querySelector("#ulogin_form_down"),
+                ulogin_info : document.querySelector("#ulogin_info_down"),
+                ulogin_identity : document.querySelector("#ulogin_identity_down"),
+                profile_link: document.querySelector("#profile_link_down"),
+                forum_submit : document.querySelector("#forum_submit_down"),
+                input_name : document.querySelector("#forum_name_down"),
+                text: document.querySelector("#forum_text_down"),
+            };
+        }     
     };
     
     //console.clear();
@@ -71,11 +91,11 @@ const auth_module = (function() {
                         case 102:
                             if (user.error.time===4294967295)
                             {
-                                alert('Пользователь блокирован навсегда');
+                                customAlert('Пользователь блокирован навсегда');
                             }
                             else
                             {
-                                alert('Пользователь блокирован до '+ new Date(user.error.time * 1000).toLocaleString('ru',{ day: 'numeric', month: 'long', year:'numeric', hour:'numeric', minute: 'numeric',
+                                customAlert('Пользователь блокирован до '+ new Date(user.error.time * 1000).toLocaleString('ru',{ day: 'numeric', month: 'long', year:'numeric', hour:'numeric', minute: 'numeric',
                                 second: 'numeric', timezone:'MSK'})); 
                             }
                             
@@ -101,7 +121,7 @@ const auth_module = (function() {
                 console.log(xhr.status + ': ' + xhr.statusText);
             }
             else 
-            {
+            {              
                 const responce = JSON.parse(xhr.responseText);
                 if (responce.error===undefined)
                 {
@@ -140,7 +160,7 @@ const auth_module = (function() {
                         if (not_all_info) {
                             if (fname_input===null || lname_input===null)
                             {
-                                alert("Ошибка формы ввода данных. Перезагрузите страницу.");
+                                customAlert("Ошибка формы ввода данных. Перезагрузите страницу.");
                                 return false;
                             }
                             
@@ -149,14 +169,14 @@ const auth_module = (function() {
 
                             if (fname==='' || lname==='')
                             {
-                                alert('Необходимо ввести данные');
+                                customAlert('Необходимо ввести данные');
                                 return false;
                             }
                         }
 
                         if (!/^\d{5}$/.test(code))
                         {
-                            alert('Код из SMS должен состоять из 5 цифр');
+                            customAlert('Код из SMS должен состоять из 5 цифр');
                             return false;
                         }
 
@@ -183,7 +203,7 @@ const auth_module = (function() {
                 {
                     if (responce.error.code=='1')
                     {
-                        alert('Ошибка в формате номера телефона');
+                        customAlert('Ошибка в формате номера телефона');
                         clearInterval(cd);
                         rb.innerHTML="Запросить код";
                         rb.disabled=false;
@@ -192,7 +212,7 @@ const auth_module = (function() {
                     }
                     else if (responce.error.code=='2')
                     {
-                        alert('Ошибка отправки SMS, попробуйте еще раз');
+                        customAlert('Ошибка отправки SMS, попробуйте еще раз');
                         clearInterval(cd);
                         rb.innerHTML="Запросить код";
                         rb.disabled=false;
@@ -201,7 +221,7 @@ const auth_module = (function() {
                     }
                     else if (responce.error.code=='3')
                     {
-                        alert('Ошибка в отправленном запросе, попробуйте позже');
+                        customAlert('Ошибка в отправленном запросе, попробуйте позже');
                         clearInterval(cd);
                         rb.innerHTML="Запросить код";
                         rb.disabled=false;
@@ -210,11 +230,11 @@ const auth_module = (function() {
                     } 
                     else if (responce.error.code=='4')
                     {
-                        alert('Время для повторного запроса еще не наступило');
+                        customAlert('Время для повторного запроса еще не наступило');
                         ab.disabled=true;
                     }                                 
                     else {
-                        alert("Неопознанная ошибка, попробуйте позже");
+                        customAlert("Неопознанная ошибка, попробуйте позже");
                     }
                 }
             }
@@ -222,11 +242,12 @@ const auth_module = (function() {
 
     };
 
-    const ulogin_callback = (token) => getInfo({token:token,mode:'ulogin',provider:'ulogin'});
+    const ulogin_callback = (token) => getInfo({token:token,mode:'ulogin'});
 
     const switch_state = (state) => {
         //login || logout
         if (state === 'login') {
+            login = true;
             remove_form();
 
             for (let i=0;i<elements.length;i+=1)
@@ -251,6 +272,9 @@ const auth_module = (function() {
                 
                 elements[i].profile_link.innerHTML=user.first_name+' '+user.last_name;
                 elements[i].ulogin_info.style.display="block";
+
+                elements[i].text.style.display="inline";
+                elements[i].forum_submit.style.display="inline";
         
                 elements[i].ulogin_form.style.display='none';
         
@@ -267,6 +291,7 @@ const auth_module = (function() {
         }
         else
         {
+            login=false;
             for (let i=0;i<elements.length;i+=1)
             {
                 //чистим данные в форме
@@ -281,6 +306,10 @@ const auth_module = (function() {
                 //показываем кнопку входа и вешаем обработчик на вывод сообщения о необходимости входа на кнопку
                 elements[i].ulogin_form.style.display='block';
                 elements[i].forum_submit.onclick = noLoginMessage;
+
+                //прячем textarea и кнопку
+                elements[i].text.style.display="none";
+                elements[i].forum_submit.style.display="none";
             }
         }
     }
@@ -313,35 +342,49 @@ const auth_module = (function() {
 
     document.addEventListener('DOMContentLoaded', () => {
 
+        //customAlert("Ошибка формы ввода данных. Перезагрузите страницу.");
         //loadCSS();
 
         //получим токен
-        const token = getCookie('auth_token');
+        const token = '';//getCookie('auth_token');
 
         setElements();
 
-        uLogin.customInit('uLogin_up','uLogin_down', {
-            redirect_uri: "",
-            display: "panel",
-            theme: "classic",
-            fields: "first_name,last_name,profile,photo",
-            providers: "vkontakte,facebook,google,odnoklassniki",
-            hidden: "",
-            redirect_uri: "",
-            mobilebuttons: 0,
-            callback: "ulogin_callback"
-        });
+        // if (mobile_version===true)
+        // {
+        //     uLogin.customInit('uLogin', {
+        //         display: "panel",
+        //         theme: "classic",
+        //         fields: "first_name,last_name,profile,photo",
+        //         providers: "vkontakte,facebook,google,odnoklassniki",
+        //         hidden: "",
+        //         callback: "ulogin_callback",
+        //         redirect_uri: "",
+        //         mobilebuttons: 0  
+        //     });
+        // }
+        // else
+        // {
+        //     uLogin.customInit('uLogin_up','uLogin_down', {
+        //         display: "panel",
+        //         theme: "classic",
+        //         fields: "first_name,last_name,profile,photo",
+        //         providers: "vkontakte,facebook,google,odnoklassniki",
+        //         hidden: "",
+        //         callback: "ulogin_callback",
+        //         redirect_uri: "",
+        //         mobilebuttons: 0
+        //     });
+        // }
 
+        switch_state('logout');
         if (token !== undefined)
         {
             //console.log('у нас есть токен');
             //в таком случае делаем сразу callback
             getInfo({mode:'auth'});
         }
-        else
-        {
-            switch_state('logout');
-        }
+
 
         //create_phone_form();
 
@@ -349,9 +392,10 @@ const auth_module = (function() {
 
     });
 
-    const noLoginMessage = () => {
-        alert("Нужно войти, чтобы оставлять комментарии");
-        return true;
+    const noLoginMessage = (e) => {
+        customAlert("Нужно войти, чтобы оставлять комментарии");
+        e.preventDefault();
+        return false;
     };
 
     const phone_auth_form = (evt) => {
@@ -446,7 +490,7 @@ const auth_module = (function() {
         const div_lname = create_input('lname','Фамилия',u.last_name);
         div.appendChild(div_lname);
 
-        //надо бы сделать загрузку фото, но это потом, может быть.
+        //загрузка фото профиля
         const div_image = create_input('image','Выберите фотографию',u.image);
         const image_input=div_image.getElementsByTagName('input')[0];
         image_input.type='file';
@@ -476,7 +520,7 @@ const auth_module = (function() {
                         //и на основной странице...
                         [...document.querySelectorAll(".profile_image")].map(el=>el.style.backgroundImage="url("+user.image+")");
                     } else {
-                        alert("Ошибка загрузки картинки");
+                        customAlert("Ошибка загрузки картинки");
                     }
                 }
             }
@@ -499,18 +543,18 @@ const auth_module = (function() {
             //сохранить это безобразие
             const xhr = new XMLHttpRequest();
 
-            const token=getCookie('auth_token');
+            const token='';//getCookie('auth_token');
             const first_name=div_fname.getElementsByTagName('input')[0].value;
             const last_name=div_lname.getElementsByTagName('input')[0].value;
             if (first_name.trim()==='' || last_name.trim()==='')
             {
-                alert("Необходимо заполнить все поля.");
+                customAlert("Необходимо заполнить все поля.");
                 return false;
             }
 
             xhr.open("POST",backend_url+'?act=update_profile',true);
             xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-            xhr.send('token='+token+'&last_name='+last_name+'&first_name='+first_name);
+            xhr.send('last_name='+last_name+'&first_name='+first_name);
     
             xhr.onreadystatechange = () => {
                 if (xhr.readyState!==4) {return;}
@@ -525,7 +569,7 @@ const auth_module = (function() {
                     }
                     else
                     {
-                        alert("Ошибка сохранения профиля: "+user.error[0].text);
+                        customAlert("Ошибка сохранения профиля: "+user.error[0].text);
                     }
                 }
             };
@@ -539,6 +583,7 @@ const auth_module = (function() {
         overlay.addEventListener('click',()=>{
             overlay.remove();
             div.remove();
+            if(!login) {switch_state('logout');}
         });
 
         document.body.appendChild(overlay);
@@ -636,7 +681,7 @@ const auth_module = (function() {
             }
             else
             {
-                alert('Неправильный номер телефона');
+                customAlert('Неправильный номер телефона');
             }
         }
 
@@ -653,6 +698,23 @@ const auth_module = (function() {
         });
 
         document.body.appendChild(overlay);
+        document.body.appendChild(div);
+    };
+
+    //iphone must die
+    const customAlert = (msg) => {
+        const div = document.createElement('div');
+        div.className="custom_alert_dialog";
+        div.innerHTML="<span>"+msg+"</span>";
+
+        const button = document.createElement("button");
+        button.innerHTML="Ок";
+
+        div.appendChild(button);
+
+        button.addEventListener('click',() =>{
+            div.remove();
+        });
         document.body.appendChild(div);
     };
 
