@@ -171,9 +171,9 @@ class authForum {
                 $ext = strtolower(pathinfo($fn, PATHINFO_EXTENSION));
                 if( in_array($ext,$ext_list) )
                 {
-                    $image=$this->user['id'].'_'.time().'.'.$ext;
+                    $image=$this->user['id'].'_'.time().'.jpg';//.$ext;
 
-                    if (!image_crop($_FILES['photo']['tmp_name'],$path.$image))
+                    if (!$this->image_crop($_FILES['photo']['tmp_name'],$path.$image))
                     {
                         echo json_encode(['error'=>['code'=>'4','text'=>'error loading image on server']]);
                         return false;
@@ -437,18 +437,27 @@ class authForum {
         $h=$w=100;
     
         list( $sw,$sh ) = getimagesize( $image );
-    
+
         $image_str = file_get_contents($image);
         $src = imagecreatefromstring($image_str);
-    
-        $thumb = imagecreatetruecolor($w,$h);
-    
+
         $hw=$sw;
         if ($sw>$sh)
         {
-        $hw=$sw;
+            $hw=$sw;
         }
-    
+
+        //если картинка меньше, то просто в png, иначе уменьшать
+        if ($sw<=$w || $sh<=$h)
+        {
+            $w=$sw;
+            $h=$sh;
+        }
+
+        $thumb = imagecreatetruecolor($w,$h);
+        imagealphablending($thumb, false);
+        imagesavealpha($thumb, true);
+        imagefill($thumb, 0, 0, imagecolorallocatealpha($thumb,255,255,255,127));
         if (imagecopyresized($thumb,$src,0,0,0,0,$w,$h,$hw,$hw))
         {
             if (imagepng($thumb,$target) && file_exists($target))
@@ -457,6 +466,7 @@ class authForum {
             }
         }
         return false;
+    
     }
 }
 
